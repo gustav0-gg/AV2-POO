@@ -1,187 +1,536 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Modal, ConfirmDialog } from '../components/Modal';
-import { Plus, Search, Pencil, Trash2, UserCheck, UserX } from 'lucide-react';
+import { ConfirmDialog } from '../components/Modal';
+import { Plus, Search } from 'lucide-react';
 
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const permissaoOpts = [
+  { value: 'admin',      label: 'Administrador' },
+  { value: 'engenheiro', label: 'Engenheiro' },
+  { value: 'operador',   label: 'Operador' },
+];
+
+const permissaoBadge = {
+  admin:      { label: 'ADMINISTRADOR', bg: '#E8EAF6', color: '#3730A3' },
+  engenheiro: { label: 'ENGENHEIRO',    bg: '#E0F5EA', color: '#065F46' },
+  operador:   { label: 'OPERADOR',      bg: '#FEF3C7', color: '#92400E' },
+};
+
+// ─── MODAL FUNCIONÁRIO ────────────────────────────────────────────────────────
 function FuncionarioModal({ func, onClose, onSave }) {
   const isEdit = !!func?.id;
+
   const [form, setForm] = useState({
-    nome: func?.nome || '',
-    email: func?.email || '',
-    cargo: func?.cargo || '',
-    departamento: func?.departamento || '',
-    status: func?.status || 'ativo',
+    idUnico:    func?.idUnico    || '',
+    permissao:  func?.permissao  || func?.role || '',
+    nome:       func?.nome       || '',
+    telefone:   func?.telefone   || '',
+    endereco:   func?.endereco   || '',
+    login:      func?.login      || func?.email || '',
+    senha:      func?.senha      || '',
   });
   const [errors, setErrors] = useState({});
+
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })); };
 
   const handleSubmit = () => {
     const e = {};
-    if (!form.nome.trim()) e.nome = 'Informe o nome.';
-    if (!form.email.trim()) e.email = 'Informe o e-mail.';
-    if (!form.cargo.trim()) e.cargo = 'Informe o cargo.';
+    if (!form.idUnico.trim())        e.idUnico   = 'Informe o ID único.';
+    if (!form.permissao)             e.permissao = 'Selecione o nível de permissão.';
+    if (!form.nome.trim())           e.nome      = 'Informe o nome completo.';
+    if (!form.telefone.trim())       e.telefone  = 'Informe o telefone.';
+    if (!form.endereco.trim())       e.endereco  = 'Informe o endereço.';
+    if (!form.login.trim())          e.login     = 'Informe o usuário de login.';
+    if (!isEdit && form.senha.length < 6) e.senha = 'Mínimo 6 caracteres.';
+    if (isEdit && form.senha && form.senha.length < 6) e.senha = 'Mínimo 6 caracteres.';
     if (Object.keys(e).length) { setErrors(e); return; }
     onSave(form);
   };
 
+  const inputStyle = (hasError) => ({
+    width: '100%',
+    padding: '13px 16px',
+    border: `1.5px solid ${hasError ? '#DC2626' : '#E0E4F0'}`,
+    borderRadius: 10,
+    fontSize: 14,
+    fontFamily: 'inherit',
+    background: '#F4F5FF',
+    color: '#1E2749',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s',
+  });
+
+  const labelStyle = {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#1E2749',
+    marginBottom: 7,
+    display: 'block',
+  };
+
   return (
-    <Modal
-      title={isEdit ? 'Editar Funcionário' : 'Cadastrar Funcionário'}
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleSubmit}>{isEdit ? 'Salvar' : 'Cadastrar'}</button>
-        </>
-      }
-    >
-      <div className="form-group">
-        <label className="form-label">Nome Completo *</label>
-        <input className={`form-input${errors.nome ? ' input-error' : ''}`} value={form.nome}
-          onChange={e => set('nome', e.target.value)} placeholder="Nome do funcionário" />
-        {errors.nome && <span className="form-error">{errors.nome}</span>}
-      </div>
-      <div className="form-group">
-        <label className="form-label">E-mail *</label>
-        <input className={`form-input${errors.email ? ' input-error' : ''}`} type="email" value={form.email}
-          onChange={e => set('email', e.target.value)} placeholder="email@empresa.com" />
-        {errors.email && <span className="form-error">{errors.email}</span>}
-      </div>
-      <div className="grid-2">
-        <div className="form-group">
-          <label className="form-label">Cargo *</label>
-          <input className={`form-input${errors.cargo ? ' input-error' : ''}`} value={form.cargo}
-            onChange={e => set('cargo', e.target.value)} placeholder="Ex: Engenheiro Aeronáutico" />
-          {errors.cargo && <span className="form-error">{errors.cargo}</span>}
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 20,
+      fontFamily: 'var(--font-body, DM Sans, sans-serif)',
+    }}>
+      <div style={{
+        background: '#fff',
+        borderRadius: 18,
+        width: '100%',
+        maxWidth: 720,
+        overflow: 'hidden',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+      }}>
+        {/* Header navy */}
+        <div style={{
+          background: '#1E2749',
+          padding: '22px 28px',
+          textAlign: 'center',
+        }}>
+          <h2 style={{ color: '#fff', fontWeight: 700, fontSize: 18, margin: 0 }}>
+            {isEdit ? 'Editar Funcionário' : 'Cadastrar Funcionário'}
+          </h2>
         </div>
-        <div className="form-group">
-          <label className="form-label">Departamento</label>
-          <input className="form-input" value={form.departamento}
-            onChange={e => set('departamento', e.target.value)} placeholder="Ex: Engenharia" />
+
+        {/* Body */}
+        <div style={{ padding: '28px 28px 8px' }}>
+
+          {/* Linha 1 — ID único + Nível de permissão */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>ID único *</label>
+              <input
+                style={inputStyle(!!errors.idUnico)}
+                placeholder="Ex: 0010"
+                value={form.idUnico}
+                onChange={e => set('idUnico', e.target.value)}
+              />
+              {errors.idUnico && <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>{errors.idUnico}</span>}
+            </div>
+            <div>
+              <label style={labelStyle}>Nível de permissão *</label>
+              <select
+                style={{ ...inputStyle(!!errors.permissao), appearance: 'none' }}
+                value={form.permissao}
+                onChange={e => set('permissao', e.target.value)}
+              >
+                <option value="">Selecionar ▾</option>
+                {permissaoOpts.map(p => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+              {errors.permissao && <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>{errors.permissao}</span>}
+            </div>
+          </div>
+
+          {/* Linha 2 — Nome completo (full width) */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Nome completo *</label>
+            <input
+              style={inputStyle(!!errors.nome)}
+              placeholder="Ex: João da Silva"
+              value={form.nome}
+              onChange={e => set('nome', e.target.value)}
+            />
+            {errors.nome && <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>{errors.nome}</span>}
+          </div>
+
+          {/* Linha 3 — Telefone + Endereço */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Telefone *</label>
+              <input
+                style={inputStyle(!!errors.telefone)}
+                placeholder="(00) 00000-0000"
+                value={form.telefone}
+                onChange={e => set('telefone', e.target.value)}
+              />
+              {errors.telefone && <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>{errors.telefone}</span>}
+            </div>
+            <div>
+              <label style={labelStyle}>Endereço *</label>
+              <input
+                style={inputStyle(!!errors.endereco)}
+                placeholder="Rua, número, cidade"
+                value={form.endereco}
+                onChange={e => set('endereco', e.target.value)}
+              />
+              {errors.endereco && <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>{errors.endereco}</span>}
+            </div>
+          </div>
+
+          {/* Linha 4 — Usuário (login) + Senha */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 8 }}>
+            <div>
+              <label style={labelStyle}>Usuário (login) *</label>
+              <input
+                style={inputStyle(!!errors.login)}
+                placeholder="Nome de usuário único"
+                value={form.login}
+                onChange={e => set('login', e.target.value)}
+              />
+              {errors.login && <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>{errors.login}</span>}
+            </div>
+            <div>
+              <label style={labelStyle}>Senha *</label>
+              <input
+                style={inputStyle(!!errors.senha)}
+                type="password"
+                placeholder={isEdit ? 'Deixe em branco para não alterar' : 'Mínimo 6 caracteres'}
+                value={form.senha}
+                onChange={e => set('senha', e.target.value)}
+              />
+              {errors.senha && <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>{errors.senha}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr',
+          gap: 12,
+          padding: '16px 28px 24px',
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '14px',
+              border: '1.5px solid #E0E4F0',
+              borderRadius: 12,
+              background: '#fff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              color: '#374151',
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            style={{
+              padding: '14px',
+              border: 'none',
+              borderRadius: 12,
+              background: '#1E2749',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Salvar funcionário
+          </button>
         </div>
       </div>
-      <div className="form-group">
-        <label className="form-label">Status</label>
-        <select className="form-select" value={form.status} onChange={e => set('status', e.target.value)}>
-          <option value="ativo">Ativo</option>
-          <option value="inativo">Inativo</option>
-        </select>
-      </div>
-    </Modal>
+    </div>
   );
 }
 
+// ─── CARD FUNCIONÁRIO ─────────────────────────────────────────────────────────
+function FuncionarioCard({ func, onEdit, onDelete }) {
+  const initials = func.nome
+    ? func.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+    : '??';
+
+  const perm = permissaoBadge[func.permissao || func.role] || {
+    label: (func.cargo || func.role || '').toUpperCase(),
+    bg: '#F3F4F6', color: '#374151',
+  };
+
+  return (
+    <div style={{
+      background: '#fff',
+      border: '1px solid #E8EAF0',
+      borderRadius: 14,
+      padding: '20px 20px 16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+      boxShadow: '0 2px 8px rgba(30,39,73,0.05)',
+      transition: 'box-shadow 0.15s',
+    }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(30,39,73,0.1)'}
+      onMouseLeave={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(30,39,73,0.05)'}
+    >
+      {/* Avatar + info */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{
+          width: 48, height: 48,
+          borderRadius: '50%',
+          background: '#1E2749',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 15, fontWeight: 700,
+          color: '#C4B5FD',
+          flexShrink: 0,
+        }}>
+          {initials}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#1E2749', marginBottom: 4 }}>
+            {func.nome}
+          </div>
+          {/* Badge permissão */}
+          <span style={{
+            display: 'inline-block',
+            padding: '2px 10px',
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            background: perm.bg,
+            color: perm.color,
+            marginBottom: 6,
+          }}>
+            {perm.label}
+          </span>
+          <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>
+            {func.idUnico && <div>ID: {func.idUnico}</div>}
+            {func.telefone && <div>{func.telefone}</div>}
+            {func.email && !func.telefone && <div>{func.email}</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* Ações */}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+        <button
+          onClick={onEdit}
+          style={{
+            padding: '5px 16px',
+            border: 'none',
+            borderRadius: 6,
+            background: '#FEF9C3',
+            color: '#854D0E',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          Editar
+        </button>
+        <button
+          onClick={onDelete}
+          style={{
+            padding: '5px 16px',
+            border: 'none',
+            borderRadius: 6,
+            background: '#FEE2E2',
+            color: '#DC2626',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          Excluir
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── CARD NOVO (placeholder) ──────────────────────────────────────────────────
+function NovoCard({ onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        border: '2px dashed #C4B5FD',
+        borderRadius: 14,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 160,
+        cursor: 'pointer',
+        background: 'transparent',
+        transition: 'background 0.15s',
+        color: '#9BAAD6',
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = '#F0EEFF'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      <div style={{
+        width: 40, height: 40,
+        borderRadius: '50%',
+        border: '2px dashed #C4B5FD',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 22, color: '#C4B5FD',
+      }}>
+        +
+      </div>
+      <span style={{ fontSize: 13, fontWeight: 600, color: '#9BAAD6' }}>Novo</span>
+    </div>
+  );
+}
+
+// ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export default function Funcionarios() {
   const { funcionarios, addFuncionario, updateFuncionario, deleteFuncionario } = useApp();
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editItem, setEditItem] = useState(null);
-  const [deleteItem, setDeleteItem] = useState(null);
+
+  const [search, setSearch]           = useState('');
+  const [filterPerm, setFilterPerm]   = useState('');
+  const [modalOpen, setModalOpen]     = useState(false);
+  const [editItem, setEditItem]       = useState(null);
+  const [deleteItem, setDeleteItem]   = useState(null);
 
   const filtered = funcionarios.filter(f => {
     const matchSearch = f.nome.toLowerCase().includes(search.toLowerCase()) ||
-      f.email.toLowerCase().includes(search.toLowerCase()) ||
-      f.cargo.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === 'all' || f.status === filterStatus;
-    return matchSearch && matchStatus;
+      (f.idUnico || '').toLowerCase().includes(search.toLowerCase());
+    const matchPerm = !filterPerm || (f.permissao || f.role) === filterPerm;
+    return matchSearch && matchPerm;
   });
 
   const handleSave = (data) => {
-    if (editItem?.id) updateFuncionario(editItem.id, data);
-    else addFuncionario(data);
+    if (editItem?.id) {
+      updateFuncionario(editItem.id, {
+        ...data,
+        role: data.permissao,
+        cargo: permissaoOpts.find(p => p.value === data.permissao)?.label || data.permissao,
+        email: data.login,
+        status: 'ativo',
+      });
+    } else {
+      addFuncionario({
+        ...data,
+        role: data.permissao,
+        cargo: permissaoOpts.find(p => p.value === data.permissao)?.label || data.permissao,
+        email: data.login,
+        status: 'ativo',
+      });
+    }
     setModalOpen(false);
     setEditItem(null);
   };
 
   const openEdit = (f) => { setEditItem(f); setModalOpen(true); };
-  const openNew = () => { setEditItem(null); setModalOpen(true); };
-
-  const ativos = funcionarios.filter(f => f.status === 'ativo').length;
+  const openNew  = () => { setEditItem(null); setModalOpen(true); };
 
   return (
-    <div className="page-wrapper">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Funcionários</h1>
-          <p className="page-subtitle">{ativos} ativo(s) de {funcionarios.length} total</p>
-        </div>
-        <button className="btn btn-primary" onClick={openNew}>
-          <Plus size={16} /> Novo Funcionário
+    <div style={{
+      padding: '32px',
+      fontFamily: 'var(--font-body, DM Sans, sans-serif)',
+      minHeight: '100vh',
+      background: 'var(--lavender-100, #F0EEFF)',
+    }}>
+
+      {/* ── Cabeçalho ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display, DM Sans, sans-serif)',
+          fontSize: 22, fontWeight: 800,
+          color: 'var(--navy-800, #1E2749)',
+          margin: 0,
+        }}>
+          Funcionários
+        </h1>
+        <button
+          onClick={openNew}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 20px',
+            background: '#1E2749',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 10,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          + Cadastrar funcionário
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="search-wrap">
-          <Search size={16} className="search-icon" />
-          <input className="search-input" placeholder="Buscar funcionário..." value={search}
-            onChange={e => setSearch(e.target.value)} />
+      {/* ── Filtros ── */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
+        {/* Busca */}
+        <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+          <Search size={15} style={{
+            position: 'absolute', left: 13, top: '50%',
+            transform: 'translateY(-50%)',
+            color: '#9CA3AF', pointerEvents: 'none',
+          }} />
+          <input
+            placeholder="Buscar por nome ou ID..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 14px 10px 38px',
+              border: '1.5px solid #E0E4F0',
+              borderRadius: 10,
+              fontSize: 14,
+              background: '#fff',
+              color: '#1E2749',
+              fontFamily: 'inherit',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
         </div>
-        <button className={`chip${filterStatus === 'all' ? ' active' : ''}`} onClick={() => setFilterStatus('all')}>Todos</button>
-        <button className={`chip${filterStatus === 'ativo' ? ' active' : ''}`} onClick={() => setFilterStatus('ativo')}>Ativos</button>
-        <button className={`chip${filterStatus === 'inativo' ? ' active' : ''}`} onClick={() => setFilterStatus('inativo')}>Inativos</button>
+
+        {/* Filtro permissão */}
+        <select
+          value={filterPerm}
+          onChange={e => setFilterPerm(e.target.value)}
+          style={{
+            padding: '10px 14px',
+            border: '1.5px solid #E0E4F0',
+            borderRadius: 10,
+            fontSize: 14,
+            background: '#fff',
+            color: filterPerm ? '#1E2749' : '#9CA3AF',
+            fontFamily: 'inherit',
+            outline: 'none',
+            minWidth: 160,
+          }}
+        >
+          <option value="">Filtrar permissão ▾</option>
+          {permissaoOpts.map(p => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
       </div>
 
-      <div className="card" style={{ padding: 0 }}>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>E-mail</th>
-                <th>Cargo</th>
-                <th>Departamento</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: 40, color: 'var(--gray-400)' }}>
-                    Nenhum funcionário encontrado.
-                  </td>
-                </tr>
-              ) : filtered.map(f => (
-                <tr key={f.id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{
-                        width: 34, height: 34,
-                        background: 'var(--lavender-200)',
-                        borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
-                        color: 'var(--navy-700)', flexShrink: 0,
-                      }}>
-                        {f.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
-                      </div>
-                      <span style={{ fontWeight: 600, color: 'var(--navy-800)' }}>{f.nome}</span>
-                    </div>
-                  </td>
-                  <td style={{ fontSize: 13, color: 'var(--gray-500)' }}>{f.email}</td>
-                  <td>{f.cargo}</td>
-                  <td style={{ fontSize: 13, color: 'var(--gray-500)' }}>{f.departamento || '—'}</td>
-                  <td>
-                    <span className={`badge ${f.status === 'ativo' ? 'badge-green' : 'badge-gray'}`}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {f.status === 'ativo' ? <UserCheck size={12} /> : <UserX size={12} />}
-                      {f.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn-icon" title="Editar" onClick={() => openEdit(f)}><Pencil size={15} /></button>
-                      <button className="btn-icon danger" title="Excluir" onClick={() => setDeleteItem(f)}><Trash2 size={15} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* ── Grid de cards ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gap: 16,
+      }}>
+        {filtered.map(f => (
+          <FuncionarioCard
+            key={f.id}
+            func={f}
+            onEdit={() => openEdit(f)}
+            onDelete={() => setDeleteItem(f)}
+          />
+        ))}
+
+        {/* Card "Novo" — só aparece quando não está filtrando */}
+        {!search && !filterPerm && (
+          <NovoCard onClick={openNew} />
+        )}
       </div>
 
+      {filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 0', color: '#9CA3AF', fontSize: 14 }}>
+          Nenhum funcionário encontrado.
+        </div>
+      )}
+
+      {/* ── Modal Cadastrar / Editar ── */}
       {modalOpen && (
         <FuncionarioModal
           func={editItem}
@@ -190,6 +539,7 @@ export default function Funcionarios() {
         />
       )}
 
+      {/* ── Confirmar Exclusão ── */}
       {deleteItem && (
         <ConfirmDialog
           title="Excluir Funcionário"

@@ -26,16 +26,15 @@ export const aeronavesMock = [
     progresso: 72,
     responsavel: 'Ana Souza',
     pecas: [
-      { id: 1, nome: 'Motor CFM56-7B', numero: 'ENG-001', quantidade: 2, status: 'aprovado', fornecedor: 'CFM International' },
-      { id: 2, nome: 'Trem de Pouso Principal', numero: 'LG-002', quantidade: 1, status: 'em_teste', fornecedor: 'Safran Landing Systems' },
-      { id: 3, nome: 'Asa Direita', numero: 'WNG-003', quantidade: 1, status: 'pendente', fornecedor: 'Embraer' },
-      { id: 4, nome: 'Fuselagem Central', numero: 'FUS-001', quantidade: 1, status: 'aprovado', fornecedor: 'Embraer' },
+      { id: 1, nome: 'Motor CFM56-7B', numero: 'ENG-001', status: 'pronta', fornecedor: 'CFM International' },
+      { id: 2, nome: 'Trem de Pouso Principal', numero: 'LG-002', status: 'em_producao', fornecedor: 'Safran Landing Systems' },
+      { id: 3, nome: 'Asa Direita', numero: 'WNG-003', status: 'pronta', fornecedor: 'Embraer' },
+      { id: 4, nome: 'Fuselagem Central', numero: 'FUS-001', status: 'em_transporte', fornecedor: 'Embraer' },
     ],
     testes: [
-      { id: 1, nome: 'Teste de Pressurização', tipo: 'pressao', resultado: 'aprovado', dataRealizacao: '2024-03-10', responsavel: 'Ana Souza', observacoes: 'Todos os parâmetros dentro do esperado.' },
-      { id: 2, nome: 'Teste de Sistemas Elétricos', tipo: 'eletrico', resultado: 'aprovado', dataRealizacao: '2024-03-15', responsavel: 'Roberto Lima', observacoes: '' },
-      { id: 3, nome: 'Teste de Motores', tipo: 'motor', resultado: 'pendente', dataRealizacao: '', responsavel: 'Ana Souza', observacoes: '' },
-      { id: 4, nome: 'Inspeção Estrutural', tipo: 'estrutural', resultado: 'reprovado', dataRealizacao: '2024-03-20', responsavel: 'Carlos Mendes', observacoes: 'Revisar fixação do trem de pouso.' },
+      { id: 1, nome: 'Teste de Pressurização', tipo: 'aerodinamico', resultado: 'aprovado', dataRealizacao: '2024-03-10', observacoes: 'Todos os parâmetros dentro do esperado.' },
+      { id: 2, nome: 'Teste de Sistemas Elétricos', tipo: 'eletrico', resultado: 'aprovado', dataRealizacao: '2024-03-15', observacoes: '' },
+      { id: 3, nome: 'Teste de Motores', tipo: 'hidraulico', resultado: 'reprovado', dataRealizacao: '2025-12-15', observacoes: '' },
     ],
     etapas: [
       { id: 1, nome: 'Projeto e Design', descricao: 'Desenvolvimento do projeto técnico e design estrutural', status: 'concluida', dataInicio: '2024-01-05', dataFim: '2024-01-30', responsavel: 'Ana Souza', ordem: 1 },
@@ -55,11 +54,11 @@ export const aeronavesMock = [
     progresso: 100,
     responsavel: 'Carlos Mendes',
     pecas: [
-      { id: 1, nome: 'Motor Williams FJ44', numero: 'ENG-010', quantidade: 2, status: 'aprovado', fornecedor: 'Williams International' },
-      { id: 2, nome: 'Avionics Suite', numero: 'AV-005', quantidade: 1, status: 'aprovado', fornecedor: 'Garmin' },
+      { id: 1, nome: 'Motor Williams FJ44', numero: 'ENG-010', status: 'em_transporte', fornecedor: 'Williams International' },
+      { id: 2, nome: 'Avionics Suite', numero: 'AV-005', status: 'em_producao', fornecedor: 'Garmin' },
     ],
     testes: [
-      { id: 1, nome: 'Voo de Certificação', tipo: 'voo', resultado: 'aprovado', dataRealizacao: '2024-02-20', responsavel: 'Carlos Mendes', observacoes: 'Aeronave aprovada para operação.' },
+      { id: 1, nome: 'Voo de Certificação', tipo: 'hidraulico', resultado: 'aprovado', dataRealizacao: '2024-02-20', observacoes: 'Aeronave aprovada para operação.' },
     ],
     etapas: [
       { id: 1, nome: 'Projeto e Design', descricao: 'Projeto completo', status: 'concluida', dataInicio: '2023-08-01', dataFim: '2023-09-30', responsavel: 'Ana Souza', ordem: 1 },

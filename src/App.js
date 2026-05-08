@@ -9,6 +9,8 @@ import AeronaveDetalhe from './pages/Aeronavedetalhe';
 import EtapasProducao from './pages/Etapasproducao';
 import Funcionarios from './pages/Funcionarios';
 import Relatorio from './pages/Relatorio';
+import Pecas from './pages/Pecas';
+import Testes from './pages/Testes';
 import './style/index.css';
 
 function AppContent() {
@@ -16,9 +18,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedAeronaveId, setSelectedAeronaveId] = useState(null);
 
-  if (!currentUser) {
-    return <Login />;
-  }
+  if (!currentUser) return <Login />;
 
   const handleViewDetail = (id) => {
     setSelectedAeronaveId(id);
@@ -32,20 +32,15 @@ function AppContent() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard onNavigate={setCurrentPage} />;
-      case 'aeronaves':
-        return <Aeronaves onViewDetail={handleViewDetail} />;
-      case 'aeronave-detalhe':
-        return <AeronaveDetalhe aeronaveId={selectedAeronaveId} onBack={handleBack} />;
-      case 'etapas':
-        return <EtapasProducao onViewAeronave={handleViewDetail} />;
-      case 'funcionarios':
-        return <Funcionarios />;
-      case 'relatorio':
-        return <Relatorio />;
-      default:
-        return <Dashboard onNavigate={setCurrentPage} />;
+      case 'dashboard':       return <Dashboard onNavigate={setCurrentPage} />;
+      case 'aeronaves':       return <Aeronaves onViewDetail={handleViewDetail} />;
+      case 'aeronave-detalhe':return <AeronaveDetalhe aeronaveId={selectedAeronaveId} onBack={handleBack} />;
+      case 'etapas':          return <EtapasProducao onViewAeronave={handleViewDetail} />;
+      case 'funcionarios':    return <Funcionarios />;
+      case 'relatorio':       return <Relatorio />;
+      case 'pecas':           return <Pecas />;
+      case 'testes':          return <Testes />;
+      default:                return <Dashboard onNavigate={setCurrentPage} />;
     }
   };
 

@@ -1,234 +1,400 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { FileText, Download, Printer } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 const statusLabel = {
   em_producao: 'Em Produção',
-  concluida: 'Concluída',
-  aguardando: 'Aguardando',
+  concluida:   'Concluída',
+  aguardando:  'Aguardando',
 };
 
-const statusBadge = {
-  em_producao: 'badge-blue',
-  concluida: 'badge-green',
-  aguardando: 'badge-amber',
+const pecaStatusLabel = {
+  aprovado:  'Pronta',
+  pronta:    'Pronta',
+  em_teste:  'Em Teste',
+  pendente:  'Pendente',
+  reprovado: 'Reprovada',
+  em_producao: 'Em Produção',
+  em_transporte: 'Em Transporte',
 };
 
-const pecaStatusLabel = { aprovado: 'Aprovado', em_teste: 'Em Teste', pendente: 'Pendente', reprovado: 'Reprovado' };
-const testeResLabel = { aprovado: 'Aprovado', reprovado: 'Reprovado', pendente: 'Pendente' };
+const tipoLabel = {
+  motor: 'Motor', pressao: 'Pressurização', eletrico: 'Elétrico',
+  estrutural: 'Estrutural', voo: 'Voo', hidraulico: 'Hidráulico', aerodinamico: 'Aerodinâmico',
+};
 
-export default function Relatorio() {
-  const { aeronaves, funcionarios } = useApp();
-  const [filterAeronave, setFilterAeronave] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [incluirPecas, setIncluirPecas] = useState(true);
-  const [incluirTestes, setIncluirTestes] = useState(true);
-  const [incluirEtapas, setIncluirEtapas] = useState(true);
+function pad(n) { return String(n).padStart(4, '0'); }
 
-  const aeronavesFiltradas = aeronaves.filter(a => {
-    if (filterAeronave !== 'all' && a.id !== parseInt(filterAeronave)) return false;
-    if (filterStatus !== 'all' && a.status !== filterStatus) return false;
-    return true;
+// ─── GERA TEXTO DO RELATÓRIO ──────────────────────────────────────────────────
+function gerarTextoRelatorio(aeronave, idx, cliente, dataEntrega) {
+  const codigo = `AV-${String(idx + 1).padStart(3, '0')}`;
+  const tipo   = aeronave.fabricante?.toLowerCase().includes('boeing') ||
+                 aeronave.modelo?.toLowerCase().includes('f-16') ? 'MILITAR' : 'COMERCIAL';
+
+  const etapasConcluidas = aeronave.etapas.filter(e => e.status === 'concluida').length;
+  const totalEtapas      = aeronave.etapas.length;
+  const testesAprov      = aeronave.testes.filter(t => t.resultado === 'aprovado').length;
+  const testesReprov     = aeronave.testes.filter(t => t.resultado === 'reprovado').length;
+
+  const dots = (label, val, width = 45) => {
+    const dotCount = width - label.length - val.length;
+    return `${label} ${'.'.repeat(Math.max(2, dotCount))} ${val}`;
+  };
+
+  let txt = '';
+  txt += '='.repeat(60) + '\n';
+  txt += '  AEROCODE — Relatório Final de Produção\n';
+  txt += '='.repeat(60) + '\n\n';
+
+  txt += `Aeronave: ${codigo} | ${aeronave.modelo} | ${tipo}\n`;
+  if (cliente)     txt += `Cliente: ${cliente}\n`;
+  if (dataEntrega) txt += `Data de entrega: ${dataEntrega}\n`;
+  txt += `Gerado em: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
+
+  txt += '-'.repeat(60) + '\n';
+  txt += `ETAPAS DE PRODUÇÃO (${etapasConcluidas}/${totalEtapas})\n`;
+  txt += '-'.repeat(60) + '\n';
+  [...aeronave.etapas].sort((a, b) => a.ordem - b.ordem).forEach((e, i) => {
+    const status = e.status === 'concluida' ? 'Concluída' : e.status === 'em_andamento' ? 'Em Andamento' : 'Pendente';
+    txt += dots(`${i + 1}. ${e.nome}`, status) + '\n';
   });
 
-  const totalPecas = aeronavesFiltradas.reduce((s, a) => s + a.pecas.length, 0);
-  const totalTestes = aeronavesFiltradas.reduce((s, a) => s + a.testes.length, 0);
-  const testesAprovados = aeronavesFiltradas.reduce((s, a) => s + a.testes.filter(t => t.resultado === 'aprovado').length, 0);
-  const testesReprovados = aeronavesFiltradas.reduce((s, a) => s + a.testes.filter(t => t.resultado === 'reprovado').length, 0);
+  txt += '\n';
+  txt += `Testes aprovados: ${testesAprov} | Reprovados: ${testesReprov}\n`;
 
-  const handlePrint = () => window.print();
+  if (aeronave.pecas.length > 0) {
+    const pecasResumo = aeronave.pecas
+      .slice(0, 4)
+      .map(p => `${p.nome} (${pecaStatusLabel[p.status] || p.status})`)
+      .join(', ');
+    const mais = aeronave.pecas.length > 4 ? `... +${aeronave.pecas.length - 4} mais` : '';
+    txt += `Peças: ${pecasResumo}${mais}\n`;
+  }
+
+  txt += '\n';
+  txt += '-'.repeat(60) + '\n';
+  txt += 'TESTES DETALHADOS\n';
+  txt += '-'.repeat(60) + '\n';
+  if (aeronave.testes.length === 0) {
+    txt += 'Nenhum teste registrado.\n';
+  } else {
+    aeronave.testes.forEach(t => {
+      const res = t.resultado === 'aprovado' ? 'Aprovado' : t.resultado === 'reprovado' ? 'Reprovado' : 'Pendente';
+      const data = t.dataRealizacao ? new Date(t.dataRealizacao + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+      txt += dots(`${t.nome} (${tipoLabel[t.tipo] || t.tipo})`, `${res} — ${data}`) + '\n';
+      if (t.observacoes) txt += `   Obs: ${t.observacoes}\n`;
+    });
+  }
+
+  txt += '\n';
+  txt += '-'.repeat(60) + '\n';
+  txt += 'PEÇAS E COMPONENTES\n';
+  txt += '-'.repeat(60) + '\n';
+  if (aeronave.pecas.length === 0) {
+    txt += 'Nenhuma peça cadastrada.\n';
+  } else {
+    aeronave.pecas.forEach(p => {
+      const status = pecaStatusLabel[p.status] || p.status;
+      txt += dots(`${p.nome} [${p.numero || '—'}] Qtd:${p.quantidade}`, status) + '\n';
+      if (p.fornecedor) txt += `   Fornecedor: ${p.fornecedor}\n`;
+    });
+  }
+
+  txt += '\n' + '='.repeat(60) + '\n';
+  txt += '  Relatório gerado automaticamente pelo sistema AEROCODE\n';
+  txt += '='.repeat(60) + '\n';
+
+  return txt;
+}
+
+// ─── COMPONENTE PRÉVIA ────────────────────────────────────────────────────────
+function PreviewRelatorio({ aeronave, idx, cliente, dataEntrega }) {
+  if (!aeronave) return null;
+
+  const codigo = `AV-${String(idx + 1).padStart(3, '0')}`;
+  const tipo   = aeronave.fabricante?.toLowerCase().includes('boeing') ||
+                 aeronave.modelo?.toLowerCase().includes('f-16') ? 'MILITAR' : 'COMERCIAL';
+
+  const etapasConcluidas = aeronave.etapas.filter(e => e.status === 'concluida').length;
+  const totalEtapas      = aeronave.etapas.length;
+  const testesAprov      = aeronave.testes.filter(t => t.resultado === 'aprovado').length;
+  const testesReprov     = aeronave.testes.filter(t => t.resultado === 'reprovado').length;
+
+  const nomeArquivo = `relatorio_${codigo}_${Date.now()}.txt`;
+  const pecasResumo = aeronave.pecas.slice(0, 3).map(p => `${p.nome} (${pecaStatusLabel[p.status] || p.status})`).join(', ');
+  const maisStr     = aeronave.pecas.length > 3 ? `...` : '';
 
   return (
-    <div className="page-wrapper">
-      <div className="page-header">
+    <div style={{
+      border: '1.5px solid #E0E4F0',
+      borderRadius: 12,
+      padding: '20px 22px',
+      background: '#FAFAFF',
+      marginTop: 4,
+    }}>
+      {/* Tag PRÉVIA */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+        color: '#9BAAD6', marginBottom: 14,
+      }}>
+        PRÉVIA DO RELATÓRIO
+      </div>
+
+      {/* Título */}
+      <div style={{ fontWeight: 800, fontSize: 15, color: '#1E2749', marginBottom: 6 }}>
+        AEROCODE — Relatório Final de Produção
+      </div>
+
+      {/* Meta */}
+      <div style={{ fontSize: 13, color: '#374151', marginBottom: 2 }}>
+        Aeronave: {codigo} | {aeronave.modelo} | {tipo}
+        {aeronave.pecas.length > 0 && ` | ${aeronave.pecas.length} peças`}
+      </div>
+      <div style={{ fontSize: 13, color: '#374151', marginBottom: 12 }}>
+        {cliente && `Cliente: ${cliente}`}
+        {cliente && dataEntrega && ' | '}
+        {dataEntrega && `Data de entrega: ${dataEntrega}`}
+      </div>
+
+      {/* Etapas */}
+      <div style={{ fontWeight: 700, fontSize: 13, color: '#1E2749', marginBottom: 6 }}>
+        Etapas de produção ({etapasConcluidas}/{totalEtapas})
+      </div>
+      {[...aeronave.etapas].sort((a, b) => a.ordem - b.ordem).slice(0, 4).map((e, i) => {
+        const s = e.status === 'concluida' ? 'Concluída' : e.status === 'em_andamento' ? 'Em Andamento' : 'Pendente';
+        return (
+          <div key={e.id} style={{ fontSize: 13, color: '#374151', marginBottom: 2 }}>
+            {i + 1}. {e.nome}
+            <span style={{ color: '#9CA3AF' }}>
+              {' '}{'·'.repeat(Math.max(2, 38 - e.nome.length))}
+            </span>
+            {' '}{s}
+          </div>
+        );
+      })}
+      {aeronave.etapas.length > 4 && (
+        <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 4 }}>
+          + {aeronave.etapas.length - 4} etapa(s) no arquivo completo
+        </div>
+      )}
+
+      {/* Testes + Peças resumo */}
+      <div style={{ fontSize: 13, color: '#374151', marginTop: 8 }}>
+        Testes aprovados: {testesAprov} | Reprovados: {testesReprov}
+      </div>
+      {aeronave.pecas.length > 0 && (
+        <div style={{ fontSize: 13, color: '#374151', marginTop: 2 }}>
+          Peças: {pecasResumo}{maisStr}
+        </div>
+      )}
+
+      {/* Link do arquivo */}
+      <div style={{ marginTop: 14, fontSize: 12, color: '#9BAAD6' }}>
+        ↓ Relatório completo disponível no arquivo .txt gerado
+      </div>
+      <div style={{ fontSize: 12, color: '#9BAAD6' }}>
+        {nomeArquivo}
+      </div>
+    </div>
+  );
+}
+
+// ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
+export default function Relatorio() {
+  const { aeronaves } = useApp();
+
+  const [aeronaveId, setAeronaveId] = useState('');
+  const [dataEntrega, setDataEntrega] = useState('');
+  const [cliente, setCliente] = useState('');
+  const [errors, setErrors] = useState({});
+
+  const aeronaveIdx     = aeronaves.findIndex(a => a.id === parseInt(aeronaveId));
+  const aeronaveSel     = aeronaveIdx >= 0 ? aeronaves[aeronaveIdx] : null;
+
+  const mostrarPrevia = aeronaveSel !== null;
+
+  const handleLimpar = () => {
+    setAeronaveId('');
+    setDataEntrega('');
+    setCliente('');
+    setErrors({});
+  };
+
+  const handleGerar = () => {
+    const e = {};
+    if (!aeronaveId)        e.aeronaveId  = 'Selecione a aeronave.';
+    if (!dataEntrega)       e.dataEntrega = 'Informe a data de entrega.';
+    if (!cliente.trim())    e.cliente     = 'Informe o nome do cliente.';
+    if (Object.keys(e).length) { setErrors(e); return; }
+
+    const texto    = gerarTextoRelatorio(aeronaveSel, aeronaveIdx, cliente, dataEntrega);
+    const codigo   = `AV-${String(aeronaveIdx + 1).padStart(3, '0')}`;
+    const filename = `relatorio_${codigo}_${Date.now()}.txt`;
+
+    const blob = new Blob([texto], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const inputStyle = (hasErr) => ({
+    width: '100%',
+    padding: '13px 16px',
+    border: `1.5px solid ${hasErr ? '#DC2626' : '#E0E4F0'}`,
+    borderRadius: 10,
+    fontSize: 14,
+    fontFamily: 'inherit',
+    background: '#fff',
+    color: '#1E2749',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s',
+  });
+
+  const labelStyle = {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#1E2749',
+    marginBottom: 7,
+    display: 'block',
+  };
+
+  const errStyle = {
+    fontSize: 12,
+    color: '#DC2626',
+    marginTop: 4,
+    display: 'block',
+  };
+
+  return (
+    <div style={{
+      padding: '32px',
+      maxWidth: 860,
+      fontFamily: 'var(--font-body, DM Sans, sans-serif)',
+    }}>
+
+      {/* ── Título ── */}
+      <h1 style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 22,
+        fontWeight: 800,
+        color: 'var(--navy-800, #1E2749)',
+        marginBottom: 8,
+      }}>
+        Gerar Relatório Final
+      </h1>
+      <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 28 }}>
+        Preencha os dados abaixo para gerar o relatório de produção da aeronave.
+      </p>
+
+      {/* ── Linha 1: Aeronave + Data de entrega ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">Geração de Relatório</h1>
-          <p className="page-subtitle">Configure e exporte o relatório de produção</p>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-ghost" onClick={handlePrint}>
-            <Printer size={16} /> Imprimir
-          </button>
-        </div>
-      </div>
-
-      <div className="grid-2" style={{ marginBottom: 24 }}>
-        {/* Filtros */}
-        <div className="card">
-          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>
-            Filtros do Relatório
-          </h2>
-
-          <div className="form-group">
-            <label className="form-label">Aeronave</label>
-            <select className="form-select" value={filterAeronave} onChange={e => setFilterAeronave(e.target.value)}>
-              <option value="all">Todas as aeronaves</option>
-              {aeronaves.map(a => <option key={a.id} value={a.id}>{a.modelo} — {a.matricula}</option>)}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Status da Aeronave</label>
-            <select className="form-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="all">Todos os status</option>
-              <option value="em_producao">Em Produção</option>
-              <option value="concluida">Concluída</option>
-              <option value="aguardando">Aguardando</option>
-            </select>
-          </div>
-
-          <hr className="divider" />
-
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 12, color: 'var(--navy-800)' }}>
-            Incluir no Relatório
-          </div>
-
-          {[
-            { label: 'Peças e Componentes', state: incluirPecas, set: setIncluirPecas },
-            { label: 'Testes Realizados', state: incluirTestes, set: setIncluirTestes },
-            { label: 'Etapas de Produção', state: incluirEtapas, set: setIncluirEtapas },
-          ].map(({ label, state, set }) => (
-            <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 10, fontSize: 14, color: 'var(--gray-800)' }}>
-              <input type="checkbox" checked={state} onChange={e => set(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: 'var(--navy-700)' }} />
-              {label}
-            </label>
-          ))}
-        </div>
-
-        {/* Resumo */}
-        <div className="card">
-          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>
-            Resumo do Relatório
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {[
-              { label: 'Aeronaves', value: aeronavesFiltradas.length },
-              { label: 'Total de Peças', value: totalPecas },
-              { label: 'Total de Testes', value: totalTestes },
-              { label: 'Testes Aprovados', value: testesAprovados },
-              { label: 'Testes Reprovados', value: testesReprovados },
-              { label: 'Funcionários', value: funcionarios.length },
-            ].map(({ label, value }) => (
-              <div key={label} className="card-sm" style={{ padding: '12px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--gray-500)', fontWeight: 500, marginBottom: 4 }}>{label}</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--navy-800)' }}>{value}</div>
-              </div>
+          <label style={labelStyle}>Aeronave *</label>
+          <select
+            style={{ ...inputStyle(!!errors.aeronaveId), appearance: 'none' }}
+            value={aeronaveId}
+            onChange={e => { setAeronaveId(e.target.value); setErrors(v => ({ ...v, aeronaveId: '' })); }}
+          >
+            <option value="">Selecionar ▾</option>
+            {aeronaves.map((a, i) => (
+              <option key={a.id} value={a.id}>
+                AV-{String(i + 1).padStart(3, '0')} — {a.modelo}
+              </option>
             ))}
+          </select>
+          {errors.aeronaveId && <span style={errStyle}>{errors.aeronaveId}</span>}
+        </div>
+
+        <div>
+          <label style={labelStyle}>Data de entrega *</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              style={{ ...inputStyle(!!errors.dataEntrega), paddingRight: 42 }}
+              type="date"
+              value={dataEntrega}
+              onChange={e => { setDataEntrega(e.target.value); setErrors(v => ({ ...v, dataEntrega: '' })); }}
+              placeholder="2025-12-31"
+            />
+            <Calendar
+              size={16}
+              style={{
+                position: 'absolute', right: 13, top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#9CA3AF', pointerEvents: 'none',
+              }}
+            />
           </div>
+          {errors.dataEntrega && <span style={errStyle}>{errors.dataEntrega}</span>}
         </div>
       </div>
 
-      {/* Report Preview */}
-      <div className="card" id="report-preview">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-          <FileText size={20} color="var(--navy-700)" />
-          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--navy-800)' }}>
-            Relatório de Produção Aeronáutica
-          </h2>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 24 }}>
-          Gerado em: {new Date().toLocaleDateString('pt-BR', { dateStyle: 'full' })}
-        </div>
+      {/* ── Linha 2: Nome do cliente ── */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={labelStyle}>Nome do cliente *</label>
+        <input
+          style={inputStyle(!!errors.cliente)}
+          placeholder="Ex: LATAM Airlines"
+          value={cliente}
+          onChange={e => { setCliente(e.target.value); setErrors(v => ({ ...v, cliente: '' })); }}
+        />
+        {errors.cliente && <span style={errStyle}>{errors.cliente}</span>}
+      </div>
 
-        {aeronavesFiltradas.length === 0 ? (
-          <div className="empty-state"><p>Nenhuma aeronave corresponde aos filtros selecionados.</p></div>
-        ) : aeronavesFiltradas.map(aeronave => (
-          <div key={aeronave.id} className="report-section">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--navy-800)' }}>
-                    {aeronave.modelo}
-                  </h3>
-                  <span className={`badge ${statusBadge[aeronave.status] || 'badge-gray'}`}>
-                    {statusLabel[aeronave.status]}
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 4 }}>
-                  Matrícula: {aeronave.matricula} · Fabricante: {aeronave.fabricante} · Ano: {aeronave.anoFabricacao}
-                  {aeronave.responsavel && ` · Responsável: ${aeronave.responsavel}`}
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--navy-800)' }}>{aeronave.progresso}%</div>
-                <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Progresso</div>
-              </div>
-            </div>
+      {/* ── Prévia do relatório ── */}
+      {mostrarPrevia && (
+        <PreviewRelatorio
+          aeronave={aeronaveSel}
+          idx={aeronaveIdx}
+          cliente={cliente}
+          dataEntrega={dataEntrega}
+        />
+      )}
 
-            {/* Peças */}
-            {incluirPecas && aeronave.pecas.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="report-section-title" style={{ fontSize: 13 }}>Peças ({aeronave.pecas.length})</div>
-                <table style={{ fontSize: 13 }}>
-                  <thead>
-                    <tr><th>Nome</th><th>Nº</th><th>Qtd</th><th>Fornecedor</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {aeronave.pecas.map(p => (
-                      <tr key={p.id}>
-                        <td>{p.nome}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{p.numero}</td>
-                        <td>{p.quantidade}</td>
-                        <td>{p.fornecedor || '—'}</td>
-                        <td>{pecaStatusLabel[p.status] || p.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Testes */}
-            {incluirTestes && aeronave.testes.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="report-section-title" style={{ fontSize: 13 }}>Testes ({aeronave.testes.length})</div>
-                <table style={{ fontSize: 13 }}>
-                  <thead>
-                    <tr><th>Nome</th><th>Tipo</th><th>Resultado</th><th>Data</th><th>Responsável</th></tr>
-                  </thead>
-                  <tbody>
-                    {aeronave.testes.map(t => (
-                      <tr key={t.id}>
-                        <td>{t.nome}</td>
-                        <td style={{ textTransform: 'capitalize' }}>{t.tipo}</td>
-                        <td>{testeResLabel[t.resultado]}</td>
-                        <td>{t.dataRealizacao ? new Date(t.dataRealizacao + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                        <td>{t.responsavel || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Etapas */}
-            {incluirEtapas && aeronave.etapas.length > 0 && (
-              <div>
-                <div className="report-section-title" style={{ fontSize: 13 }}>Etapas de Produção</div>
-                <table style={{ fontSize: 13 }}>
-                  <thead>
-                    <tr><th>#</th><th>Nome</th><th>Status</th><th>Início</th><th>Conclusão</th><th>Responsável</th></tr>
-                  </thead>
-                  <tbody>
-                    {[...aeronave.etapas].sort((a, b) => a.ordem - b.ordem).map(e => (
-                      <tr key={e.id}>
-                        <td>{e.ordem}</td>
-                        <td>{e.nome}</td>
-                        <td>{e.status === 'concluida' ? 'Concluída' : e.status === 'em_andamento' ? 'Em Andamento' : 'Pendente'}</td>
-                        <td>{e.dataInicio ? new Date(e.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                        <td>{e.dataFim ? new Date(e.dataFim + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                        <td>{e.responsavel || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <hr className="divider" />
-          </div>
-        ))}
+      {/* ── Botões ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 12,
+        marginTop: mostrarPrevia ? 24 : 16,
+        maxWidth: 560,
+      }}>
+        <button
+          onClick={handleLimpar}
+          style={{
+            padding: '14px',
+            border: '1.5px solid #E0E4F0',
+            borderRadius: 12,
+            background: '#fff',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            color: '#374151',
+          }}
+        >
+          Limpar
+        </button>
+        <button
+          onClick={handleGerar}
+          style={{
+            padding: '14px',
+            border: 'none',
+            borderRadius: 12,
+            background: '#1E2749',
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          Gerar e baixar relatório
+        </button>
       </div>
     </div>
   );
